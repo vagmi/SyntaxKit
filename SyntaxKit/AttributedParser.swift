@@ -48,21 +48,21 @@ public class AttributedParser: Parser {
 	// MARK: - Private
 
 	private func attributesForScope(scope: String) -> Attributes? {
-		let components = scope.componentsSeparatedByString(".") as NSArray
-		let count = components.count
-		if count == 0 {
+		let components = scope.componentsSeparatedByString(".")
+        
+		guard components.count > 0 else {
 			return nil
 		}
-
+        
 		var attributes = Attributes()
-		for i in 0..<components.count {
-			let key = (components.subarrayWithRange(NSMakeRange(0, count - 1 - i)) as NSArray).componentsJoinedByString(".")
-			if let attrs = theme.attributes[key] {
-				for (k, v) in attrs {
-					attributes[k] = v
-				}
-			}
-		}
+        for i in 1..<components.count {
+            let key = components[0..<i].joinWithSeparator(".")
+            if let attrs = theme.attributes[key] {
+                for (k, v) in attrs {
+                    attributes[k] = v
+                }
+            }
+        }
 
 		if attributes.isEmpty {
 			return nil
