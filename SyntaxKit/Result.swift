@@ -23,3 +23,8 @@ struct Result {
 		self.range = range
 	}
 }
+
+extension Result: Equatable {}
+func ==(lhs: Result, rhs: Result) -> Bool {
+    return lhs.scope == rhs.scope && NSEqualRanges(lhs.range, rhs.range)
+}
