@@ -8,14 +8,11 @@
 
 import Foundation
 
-struct ResultSet {
+public struct ResultSet {
 
 	// MARK: - Properties
 
-	private var _results = [Result]()
-	var results: [Result] {
-		return _results
-	}
+	private(set) var results = [Result]()
 
 	var range: NSRange?
 
@@ -27,7 +24,7 @@ struct ResultSet {
 	// MARK: - Adding
 
 	mutating func addResult(result: Result) {
-		_results.append(result)
+		results.append(result)
 
 		guard let range = range else {
 			self.range = result.range

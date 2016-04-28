@@ -28,19 +28,16 @@ public class AttributedParser: Parser {
 
 	// MARK: - Parsing
 
-	public func parse(string: String, match callback: AttributedCallback) {
-		parse(string) { scope, range in
-			callback(scope: scope, range: range, attributes: self.attributesForScope(scope))
-		}
-	}
-
 	public func attributedStringForString(string: String, baseAttributes: Attributes? = nil) -> NSAttributedString {
+        let resultSet = parse(string)
 		let output = NSMutableAttributedString(string: string, attributes: baseAttributes)
-		parse(string) { _, range, attributes in
-			if let attributes = attributes {
-				output.addAttributes(attributes, range: range)
-			}
-		}
+        
+        for result in resultSet.results {
+            if let attributes = attributesForScope(result.scope) {
+                output.addAttributes(attributes, range: result.range)
+            }
+        }
+
 		return output
 	}
 

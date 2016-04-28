@@ -50,7 +50,19 @@ func simpleTheme() -> Theme! {
 				"settings": [
 					"color": "purple"
 				]
-			]
+			],
+            [
+                "scope": "keyword",
+                "settings": [
+                    "color": "green"
+                ]
+            ],
+            [
+                "scope": "storage",
+                "settings": [
+                    "color": "orange"
+                ]
+            ]
 		]
 	])
 }
@@ -95,4 +107,11 @@ extension NSRange: Equatable { }
 
 public func ==(lhs: NSRange, rhs: NSRange) -> Bool {
 	return lhs.location == rhs.location && lhs.length == rhs.length
+}
+
+func printResults(results: [Result], input: String) {
+    results.forEach { r in
+        let text = (input as NSString).substringWithRange(r.range)
+        print("range: \(r.range), scope: \(r.scope), text: \(text)")
+    }
 }

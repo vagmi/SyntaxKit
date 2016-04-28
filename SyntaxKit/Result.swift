@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct Result {
+public struct Result {
 
 	// MARK: - Properties
 
@@ -25,6 +25,6 @@ struct Result {
 }
 
 extension Result: Equatable {}
-func ==(lhs: Result, rhs: Result) -> Bool {
+public func ==(lhs: Result, rhs: Result) -> Bool {
     return lhs.scope == rhs.scope && NSEqualRanges(lhs.range, rhs.range)
 }

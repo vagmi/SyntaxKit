@@ -10,11 +10,6 @@ import Foundation
 
 public class Parser {
 
-	// MARK: - Types
-
-	public typealias Callback = (scope: String, range: NSRange) -> Void
-
-
 	// MARK: - Properties
 
 	public let language: Language
@@ -29,115 +24,165 @@ public class Parser {
 
 	// MARK: - Parsing
 
-	public func parse(string: String, match callback: Callback) {
+	public func parse(string: String) -> ResultSet {
 		// Loop through paragraphs
 		let s: NSString = string
 		let length = s.length
 		var paragraphEnd = 0
 
+        var resultSet = ResultSet()
+        
 		while paragraphEnd < length {
 			var paragraphStart = 0
 			var contentsEnd = 0
 			s.getParagraphStart(&paragraphStart, end: &paragraphEnd, contentsEnd: &contentsEnd, forRange: NSMakeRange(paragraphEnd, 0))
 
-			let paragraphRange = NSMakeRange(paragraphStart, contentsEnd - paragraphStart)
+            let paragraphRange = NSRange(location: paragraphStart, length: contentsEnd - paragraphStart)
 			let limit = NSMaxRange(paragraphRange)
-			var range = paragraphRange
+			let range = paragraphRange
 
-			// Loop through the line until we reach the end
-			while range.length > 0 && range.location < limit {
-				let location = parse(string, inRange: range, callback: callback)
-				range.location = Int(location)
-				range.length = max(0, range.length - paragraphRange.location - range.location)
-			}
+            let line = s.substringWithRange(paragraphRange)
+            print("- parsing line: \(line)")
+            print("  -> start: \(paragraphStart), end: \(paragraphEnd), contentsEnd: \(contentsEnd), limit: \(limit), paragraphRange: \(paragraphRange)")
+
+            let paragraphResults = parseLine(string, inRange: range)
+            resultSet.addResults(paragraphResults)
 		}
+        
+        return resultSet
 	}
-
+    
+    public func parseLine(line: String, inRange bounds: NSRange) -> ResultSet {
+        let substring = (line as NSString).substringWithRange(bounds)
+        print(" - parseLine: \(substring), bounds: \(bounds)")
+        var resultSet = ResultSet()
+        
+        for pattern in language.patterns {
+            if let results = resultsForPattern(pattern, line: line, bounds: bounds) {
+                resultSet.addResults(results)
+            }
+        }
+        
+        return resultSet
+    }
 
 	// MARK: - Private
-
-	/// Returns new location
-	private func parse(string: String, inRange bounds: NSRange, callback: Callback) -> UInt {
-		for pattern in language.patterns {
-			// Single pattern
-			if let match = pattern.match {
-				if let resultSet = parse(string, inRange: bounds, scope: pattern.name, expression: match, captures: pattern.captures) {
-					return applyResults(resultSet, callback: callback)
-				} else {
-					continue
-				}
-			}
-
-			// Begin & end
-			if let begin = pattern.begin, end = pattern.end {
-				guard let beginResults = parse(string, inRange: bounds, expression: begin, captures: pattern.beginCaptures),
-					beginRange = beginResults.range else { continue }
-
-				let location = NSMaxRange(beginRange)
-				let endBounds = NSMakeRange(location, NSMaxRange(bounds) - location)
-
-				guard let endResults = parse(string, inRange: endBounds, expression: end, captures: pattern.endCaptures),
-					endRange = endResults.range else { /* TODO: Rewind? */ continue }
-
-				// Add whole scope before start and end
-				var results = ResultSet()
-				if let name = pattern.name {
-					results.addResult(Result(scope: name, range: NSUnionRange(beginRange, endRange)))
-				}
-
-				results.addResults(beginResults)
-				results.addResults(endResults)
-
-				return applyResults(results, callback: callback)
-			}
-		}
-
-		return UInt(NSMaxRange(bounds))
-	}
-
-	/// Parse an expression with captures
-	private func parse(string: String, inRange bounds: NSRange, scope: String? = nil, expression expressionString: String, captures: CaptureCollection?) -> ResultSet? {
-		let matches: [NSTextCheckingResult]
-		do {
-			let expression = try NSRegularExpression(pattern: expressionString, options: [.CaseInsensitive])
-			matches = expression.matchesInString(string, options: [], range: bounds)
-		} catch {
-			return nil
-		}
-
-		guard let result = matches.first else { return nil }
-
-		var resultSet = ResultSet()
-		if let scope = scope where result.range.location != NSNotFound {
-			resultSet.addResult(Result(scope: scope, range: result.range))
-		}
-
-		if let captures = captures {
-			for index in captures.captureIndexes {
-				let range = result.rangeAtIndex(Int(index))
-				if range.location == NSNotFound {
-					continue
-				}
-
-				if let scope = captures[index]?.name {
-					resultSet.addResult(Result(scope: scope, range: range))
-				}
-			}
-		}
-
-		if !resultSet.isEmpty {
-			return resultSet
-		}
-
-		return nil
-	}
-
-	private func applyResults(resultSet: ResultSet, callback: Callback) -> UInt {
-		var i = 0
-		for result in resultSet.results {
-			callback(scope: result.scope, range: result.range)
-			i = max(NSMaxRange(result.range), i)
-		}
-		return UInt(i)
-	}
+    
+    private func resultsForPattern(pattern: Pattern, line: String, bounds: NSRange) -> ResultSet? {
+        // Single pattern
+        if let match = pattern.match, matches = matchesForString(line, bounds: bounds, pattern: match) where !matches.isEmpty {
+            print(" - match pattern: \(pattern.name), matches: \(matches.count)")
+            
+            var resultSet = ResultSet()
+            
+            if let scope = pattern.name {
+                matches.forEach { resultSet.addResult(Result(scope: scope, range: $0.range)) }
+            }
+            
+            // Assign captures
+            if let captures = pattern.captures {
+                matches.forEach {
+                    if let results = captureResultsForMatch($0, captures: captures) {
+                        resultSet.addResults(results)
+                    }
+                }
+            }
+            
+            for pattern in pattern.subpatterns {
+                if let results = resultsForPattern(pattern, line: line, bounds: bounds) {
+                    print(" - sub-pattern match results: \(results)")
+                    resultSet.addResults(results)
+                }
+            }
+            
+            return resultSet
+        }
+        
+        // Begin & end
+        if let beginPattern = pattern.begin, endPattern = pattern.end, beginMatches = matchesForString(line, bounds: bounds, pattern: beginPattern) where !beginMatches.isEmpty {
+            let beginMatch = beginMatches.first!
+            let beginRange = beginMatch.range
+            var resultSet = ResultSet()
+            let endStart = NSMaxRange(beginMatch.range)
+            let endBounds = NSRange(location: endStart, length: NSMaxRange(bounds) - endStart)
+            let endMatches = matchesForString(line, bounds: endBounds, pattern: endPattern)
+            let endMatch = endMatches?.first
+            let endRange = endMatch?.range ?? NSRange(location: NSMaxRange(bounds), length: 0)
+            print(" - begin/end pattern match: \(pattern.name), beginMatches: \(beginMatches), endMatches: \(endMatches)")
+            
+            // Assign scope to entire matching range
+            if let scope = pattern.name {
+                let fullRange = NSUnionRange(beginRange, endRange)
+                let result = Result(scope: scope, range: fullRange)
+                resultSet.addResult(result)
+            }
+            
+            // Assign begin captures
+            if let captures = pattern.beginCaptures ?? pattern.captures {
+                beginMatches.forEach {
+                    if let results = captureResultsForMatch($0, captures: captures) {
+                        resultSet.addResults(results)
+                    }
+                }
+            }
+            
+            // Assign end captures
+            if let endMatches = endMatches, captures = pattern.endCaptures ?? pattern.captures {
+                endMatches.forEach {
+                    if let results = captureResultsForMatch($0, captures: captures) {
+                        resultSet.addResults(results)
+                    }
+                }
+            }
+            
+            // Check sub-patterns
+            
+            let innerLocation = NSMaxRange(beginRange)
+            let innerBounds = NSRange(location: innerLocation, length: endRange.location - innerLocation)
+            let innerString = (line as NSString).substringWithRange(innerBounds)
+            print(" - checking sub-patterns, beginRange: \(beginRange), endRange: \(endRange), innerBounds: \(innerBounds), \(innerString)")
+            for pattern in pattern.subpatterns {
+                if let results = resultsForPattern(pattern, line: line, bounds: innerBounds) {
+                    print(" - sub-pattern match results: \(results)")
+                    resultSet.addResults(results)
+                }
+            }
+            
+            return resultSet
+        }
+        
+        return nil
+    }
+    
+    private func matchesForString(string: String, bounds: NSRange, pattern: String) -> [NSTextCheckingResult]? {
+        let matches: [NSTextCheckingResult]
+        do {
+            let expression = try NSRegularExpression(pattern: pattern, options: [])
+            matches = expression.matchesInString(string, options: [], range: bounds)
+        } catch let error {
+            print("*** exception creating expresssion: \(error)")
+            return nil
+        }
+        
+        return matches
+    }
+    
+    private func captureResultsForMatch(match: NSTextCheckingResult, captures: CaptureCollection) -> ResultSet? {
+        var resultSet = ResultSet()
+        
+        for index in captures.captureIndexes {
+            print("   --- capture index: \(index)")
+            let range = match.rangeAtIndex(Int(index))
+            if range.location == NSNotFound {
+                continue
+            }
+            
+            if let scope = captures[index]?.name {
+                print("   --- adding capture result: \(scope), range: \(range)")
+                resultSet.addResult(Result(scope: scope, range: range))
+            }
+        }
+        
+        return resultSet.isEmpty ? nil : resultSet
+    }
 }
