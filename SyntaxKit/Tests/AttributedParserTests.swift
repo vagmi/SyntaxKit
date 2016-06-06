@@ -17,37 +17,30 @@ class AttributedParserTests: XCTestCase {
         let parser = AttributedParser(language: language("YAML"), theme: simpleTheme())
         let input = "title: Hello World\ncount: 42\n"
 		let string = parser.attributedStringForString(input)
-
-		XCTAssertEqual(["color": "blue"] as NSDictionary, string.attributesAtIndex(0, effectiveRange: nil) as NSDictionary)
-		XCTAssertEqual(["color": "red"] as NSDictionary, string.attributesAtIndex(7, effectiveRange: nil) as NSDictionary)
-		XCTAssertEqual(["color": "blue"] as NSDictionary, string.attributesAtIndex(19, effectiveRange: nil) as NSDictionary)
-		XCTAssertEqual(["color": "purple"] as NSDictionary, string.attributesAtIndex(25, effectiveRange: nil) as NSDictionary)
+        
+        XCTAssertEqual(string.attribute("color", atIndex: 0, effectiveRange: nil) as? String, "blue")
+		XCTAssertEqual(string.attribute("color", atIndex: 7, effectiveRange: nil) as? String, "red")
+		XCTAssertEqual(string.attribute("color", atIndex: 19, effectiveRange: nil) as? String, "blue")
+		XCTAssertEqual(string.attribute("color", atIndex: 25, effectiveRange: nil) as? String, "purple")
 	}
+
+    func testParsingRuby() {
+        let parser = AttributedParser(language: language("Ruby"), theme: simpleTheme())
+        let input = "class Foo\nend"
+        let string = parser.attributedStringForString(input)
+        
+        XCTAssertEqual(string.attribute("color", atIndex: 0, effectiveRange: nil) as? String, "green")
+        XCTAssertEqual(string.attribute("color", atIndex: 6, effectiveRange: nil) as? String, "blue")
+        XCTAssertEqual(string.attribute("color", atIndex: 10, effectiveRange: nil) as? String, "green")
+    }
     
     func testParsingJavaScript() {
         let parser = AttributedParser(language: language("JavaScript"), theme: simpleTheme())
         let input = "var a = 1;"
-
         let string = parser.attributedStringForString(input)
         
-        XCTAssertEqual(["color": "orange"] as NSDictionary, string.attributesAtIndex(0, effectiveRange: nil) as NSDictionary)
-        XCTAssertEqual(["color": "green"] as NSDictionary, string.attributesAtIndex(6, effectiveRange: nil) as NSDictionary)
-        XCTAssertEqual(["color": "purple"] as NSDictionary, string.attributesAtIndex(8, effectiveRange: nil) as NSDictionary)
-    }
-    
-    func testParsingJavaScriptTomorrowTheme() {
-        let path = "/Users/zach/Desktop/tomorrow-night.tmTheme"
-        let dict = NSDictionary(contentsOfFile: path)! as [NSObject: AnyObject]
-        let theme = Theme(dictionary: dict)!
-        
-        let parser = AttributedParser(language: language("JavaScript"), theme: theme)
-        let input = "var a = 1;"
-        
-        let _ = parser.attributedStringForString(input)
-        //print("\(string)")
-        
-        //XCTAssertEqual(["color": "orange"] as NSDictionary, string.attributesAtIndex(0, effectiveRange: nil) as NSDictionary)
-        //XCTAssertEqual(["color": "green"] as NSDictionary, string.attributesAtIndex(6, effectiveRange: nil) as NSDictionary)
-        //XCTAssertEqual(["color": "purple"] as NSDictionary, string.attributesAtIndex(8, effectiveRange: nil) as NSDictionary)
+        XCTAssertEqual(string.attribute("color", atIndex: 0, effectiveRange: nil) as? String, "orange")
+        XCTAssertEqual(string.attribute("color", atIndex: 6, effectiveRange: nil) as? String, "green")
+        XCTAssertEqual(string.attribute("color", atIndex: 8, effectiveRange: nil) as? String, "purple")
     }
 }
