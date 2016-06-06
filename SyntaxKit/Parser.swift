@@ -38,13 +38,7 @@ public class Parser {
 			s.getParagraphStart(&paragraphStart, end: &paragraphEnd, contentsEnd: &contentsEnd, forRange: NSMakeRange(paragraphEnd, 0))
 
             let paragraphRange = NSRange(location: paragraphStart, length: contentsEnd - paragraphStart)
-			let limit = NSMaxRange(paragraphRange)
 			let range = paragraphRange
-
-            let line = s.substringWithRange(paragraphRange)
-            print("- parsing line: \(line)")
-            print("  -> start: \(paragraphStart), end: \(paragraphEnd), contentsEnd: \(contentsEnd), limit: \(limit), paragraphRange: \(paragraphRange)")
-
             let paragraphResults = parseLine(string, inRange: range)
             resultSet.addResults(paragraphResults)
 		}
@@ -53,8 +47,6 @@ public class Parser {
 	}
     
     public func parseLine(line: String, inRange bounds: NSRange) -> ResultSet {
-        let substring = (line as NSString).substringWithRange(bounds)
-        print(" - parseLine: \(substring), bounds: \(bounds)")
         var resultSet = ResultSet()
         
         for pattern in language.patterns {
@@ -71,8 +63,6 @@ public class Parser {
     private func resultsForPattern(pattern: Pattern, line: String, bounds: NSRange) -> ResultSet? {
         // Single pattern
         if let match = pattern.match, matches = matchesForString(line, bounds: bounds, pattern: match) where !matches.isEmpty {
-            print(" - match pattern: \(pattern.name), matches: \(matches.count)")
-            
             var resultSet = ResultSet()
             
             if let scope = pattern.name {
@@ -90,7 +80,6 @@ public class Parser {
             
             for pattern in pattern.subpatterns {
                 if let results = resultsForPattern(pattern, line: line, bounds: bounds) {
-                    print(" - sub-pattern match results: \(results)")
                     resultSet.addResults(results)
                 }
             }
@@ -108,7 +97,6 @@ public class Parser {
             let endMatches = matchesForString(line, bounds: endBounds, pattern: endPattern)
             let endMatch = endMatches?.first
             let endRange = endMatch?.range ?? NSRange(location: NSMaxRange(bounds), length: 0)
-            print(" - begin/end pattern match: \(pattern.name), beginMatches: \(beginMatches), endMatches: \(endMatches)")
             
             // Assign scope to entire matching range
             if let scope = pattern.name {
@@ -139,11 +127,9 @@ public class Parser {
             
             let innerLocation = NSMaxRange(beginRange)
             let innerBounds = NSRange(location: innerLocation, length: endRange.location - innerLocation)
-            let innerString = (line as NSString).substringWithRange(innerBounds)
-            print(" - checking sub-patterns, beginRange: \(beginRange), endRange: \(endRange), innerBounds: \(innerBounds), \(innerString)")
+
             for pattern in pattern.subpatterns {
                 if let results = resultsForPattern(pattern, line: line, bounds: innerBounds) {
-                    print(" - sub-pattern match results: \(results)")
                     resultSet.addResults(results)
                 }
             }
@@ -171,14 +157,12 @@ public class Parser {
         var resultSet = ResultSet()
         
         for index in captures.captureIndexes {
-            print("   --- capture index: \(index)")
             let range = match.rangeAtIndex(Int(index))
             if range.location == NSNotFound {
                 continue
             }
             
             if let scope = captures[index]?.name {
-                print("   --- adding capture result: \(scope), range: \(range)")
                 resultSet.addResult(Result(scope: scope, range: range))
             }
         }
