@@ -15,54 +15,39 @@ class ParserTests: XCTestCase {
 
 	func testParsingBeginEnd() {
         let parser = Parser(language: language("YAML"))
-
-		var stringQuoted: NSRange?
-		var punctuationBegin: NSRange?
-		var punctuationEnd: NSRange?
-
-		let resultSet = parser.parse("title: \"Hello World\"\n")
-            
-        for result in resultSet.results {
-            if stringQuoted == nil && result.scope.hasPrefix("string.quoted.double") {
-                stringQuoted = result.range
-            }
-            
-            if punctuationBegin == nil && result.scope.hasPrefix("punctuation.definition.string.begin") {
-                punctuationBegin = result.range
-            }
-            
-            if punctuationEnd == nil && result.scope.hasPrefix("punctuation.definition.string.end") {
-                punctuationEnd = result.range
-            }
-        }
-
-	
-		XCTAssertEqual(NSMakeRange(7, 13), stringQuoted!)
-		XCTAssertEqual(NSMakeRange(7, 1), punctuationBegin!)
-		XCTAssertEqual(NSMakeRange(19, 1), punctuationEnd!)
+        let input = "title: \"Hello World\""
+        let resultSet = parser.parse(input)
+        
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "string.unquoted.yaml", range: NSRange(location: 0, length: 20))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "entity.name.tag.yaml", range: NSRange(location: 0, length: 5))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.definition.string.begin.yaml", range: NSRange(location: 7, length: 1))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.definition.string.end.yaml", range: NSRange(location: 19, length: 1))))
 	}
 
 	func testParsingBeginEndCrap() {
         let parser = Parser(language: language("YAML"))
-
-		var stringQuoted: NSRange?
-
-		let resultSet = parser.parse("title: Hello World\ncomments: 24\nposts: \"12\"zz\n")
-        
-        for result in resultSet.results {
-			if stringQuoted == nil && result.scope.hasPrefix("string.quoted.double") {
-				stringQuoted = result.range
-			}
-		}
+        let input = "title: Hello World\ncomments: 24\nposts: \"12\"zz\n"
+        let resultSet = parser.parse(input)
 	
-		XCTAssertEqual(NSMakeRange(39, 4), stringQuoted!)
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "string.quoted.double.yaml", range: NSRange(location: 39, length: 4))))
 	}
+    
+    // MARK: - Ruby
 
 	func testRuby() {
 		let parser = Parser(language: language("Ruby"))
 		let input = fixture("test.rb", "txt")
 		let _  = parser.parse(input)
 	}
+    
+    func testRuby_parseClass() {
+        let parser = Parser(language: language("Ruby"))
+        let input = "class Foo"
+        let resultSet = parser.parse(input)
+        
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "keyword.control.class.ruby", range: NSRange(location: 0, length: 5))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "entity.name.type.class.ruby", range: NSRange(location: 6, length: 3))))
+    }
     
     // MARK: - JavaScript
     
@@ -83,8 +68,6 @@ class ParserTests: XCTestCase {
         let parser = Parser(language: language("JavaScript"))
         let resultSet = parser.parse(">")
         
-        print(resultSet)
-        
         XCTAssertEqual(resultSet.results[0], Result(scope: "keyword.operator.js", range: NSRange(location: 0, length: 1)))
     }
     
@@ -94,8 +77,9 @@ class ParserTests: XCTestCase {
         let resultSet = parser.parse(input)
         
         printResults(resultSet.results, input: input)
-        
-        //XCTAssertEqual(results[0], Result(scope: "keyword.operator.js", range: NSRange(location: 0, length: 1)))
+
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "entity.name.function.js", range: NSRange(location: 9, length: 3))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "variable.parameter.function.js", range: NSRange(location: 13, length: 3))))
     }
     
     func testJavaScript_parseStorage() {
@@ -111,20 +95,19 @@ class ParserTests: XCTestCase {
         let input = " // a comment"
         let resultSet = parser.parse(input)
         
-        printResults(resultSet.results, input: input)
-        
         XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.whitespace.comment.leading.js", range: NSRange(location: 0, length: 1))))
         XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "comment.line.double-slash.js", range: NSRange(location: 1, length: 12))))
     }
 
     func testJavaScript_parseCommentBlock() {
         let parser = Parser(language: language("JavaScript"))
-        let input = "/* a comment */"
+        let input = "/* foo */"
         let resultSet = parser.parse(input)
         
-        printResults(resultSet.results, input: input)
-        
-        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "comment.block.js", range: NSRange(location: 0, length: 15))))
+        XCTAssertEqual(resultSet.results.count, 3)
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.definition.comment.js", range: NSRange(location: 0, length: 2))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "comment.block.js", range: NSRange(location: 0, length: 9))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.definition.comment.js", range: NSRange(location: 7, length: 2))))
     }
     
     func testJavaScript_parseMultilineComment() {
@@ -132,18 +115,13 @@ class ParserTests: XCTestCase {
         let input = "/* a\ncomment */"
         let resultSet = parser.parse(input)
         
-        printResults(resultSet.results, input: input)
-        
-        XCTAssertEqual(resultSet.results.count, 2)
-        //XCTAssertEqual(results[0], Result(scope: "comment.js", range: NSRange(location: 0, length: 2)))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "comment.block.js", range: NSRange(location: 0, length: 4))))
     }
     
     func testJavaScript_parseString() {
         let parser = Parser(language: language("JavaScript"))
         let input = "\"foo\""
         let resultSet = parser.parse(input)
-        
-        printResults(resultSet.results, input: input)
         
         XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "string.quoted.double.js", range: NSRange(location: 0, length: 5))))
         XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.definition.string.begin.js", range: NSRange(location: 0, length: 1))))
@@ -155,14 +133,10 @@ class ParserTests: XCTestCase {
         let input = "var a = 10;"
         let resultSet = parser.parse(input)
         
-        printResults(resultSet.results, input: input)
-        
         XCTAssertEqual(resultSet.results.count, 4)
-        
-        // TODO: don't depend on order of rules
-        XCTAssertEqual(resultSet.results[0], Result(scope: "constant.numeric.js", range: NSRange(location: 8, length: 2)))
-        XCTAssertEqual(resultSet.results[1], Result(scope: "storage.type.js", range: NSRange(location: 0, length: 3)))
-        XCTAssertEqual(resultSet.results[2], Result(scope: "keyword.operator.js", range: NSRange(location: 6, length: 1)))
-        XCTAssertEqual(resultSet.results[3], Result(scope: "punctuation.terminator.statement.js", range: NSRange(location: 10, length: 1)))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "constant.numeric.js", range: NSRange(location: 8, length: 2))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "storage.type.js", range: NSRange(location: 0, length: 3))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "keyword.operator.js", range: NSRange(location: 6, length: 1))))
+        XCTAssertNotNil(resultSet.results.indexOf(Result(scope: "punctuation.terminator.statement.js", range: NSRange(location: 10, length: 1))))
     }
 }
