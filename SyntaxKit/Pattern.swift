@@ -32,7 +32,7 @@ final class Pattern {
 
 	// MARK: - Initializers
 
-	init?(dictionary: [NSObject: AnyObject], parent: Pattern? = nil) {
+    init?(dictionary: [NSObject: AnyObject], parent: Pattern? = nil, repository: Repository? = nil) {
 		self.parent = parent
 		self.name = dictionary["name"] as? String
 		self.match = dictionary["match"] as? String
@@ -60,11 +60,27 @@ final class Pattern {
 		var patterns = [Pattern]()
 		if let array = dictionary["patterns"] as? [[NSObject: AnyObject]] {
 			for value in array {
-				if let pattern = Pattern(dictionary: value, parent: parent) {
+                if let include = value["include"] as? String where include.hasPrefix("#") {
+                    let key = include.substringFromIndex(include.startIndex.successor())
+                    if let repo = repository, pattern = repo[key] {
+                        patterns += pattern.subpatterns
+                        continue
+                    } else {
+                        print("**** error: couldn't include pattern from repository: \(key)")
+                    }
+                }
+                
+				if let pattern = Pattern(dictionary: value, parent: parent, repository: repository) {
 					patterns.append(pattern)
 				}
 			}
 		}
 		self.patterns = patterns
 	}
+}
+
+extension Pattern: CustomStringConvertible {
+    var description: String {
+        return "<Pattern name: \(name), match: \(match), begin: \(begin), end: \(end), subpatterns: \(subpatterns)>"
+    }
 }

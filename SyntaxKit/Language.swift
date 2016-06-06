@@ -8,6 +8,8 @@
 
 import Foundation
 
+typealias Repository = [String: Pattern]
+
 public struct Language {
 
 	// MARK: - Properties
@@ -30,7 +32,7 @@ public struct Language {
 		self.name = name
 		self.scopeName = scopeName
 
-		var repository = [String: Pattern]()
+		var repository = Repository()
 		if let repo = dictionary["repository"] as? [String: [NSObject: AnyObject]] {
 			for (key, value) in repo {
 				if let pattern = Pattern(dictionary: value) {
@@ -42,15 +44,17 @@ public struct Language {
 		var patterns = [Pattern]()
 		if let array = dictionary["patterns"] as? [[NSObject: AnyObject]] {
 			for value in array {
-				if let include = value["include"] as? String {
+                if let include = value["include"] as? String where include.hasPrefix("#") {
 					let key = include.substringFromIndex(include.startIndex.successor())
 					if let pattern = repository[key] {
 						patterns.append(pattern)
 						continue
-					}
-				}
+                    } else {
+                        print("**** error: couldn't include pattern from repository: \(key)")
+                    }
+                }
 
-				if let pattern = Pattern(dictionary: value) {
+                if let pattern = Pattern(dictionary: value, repository: repository) {
 					patterns.append(pattern)
 				}
 			}
